@@ -1,0 +1,1436 @@
+unit Utils.Conexion;
+
+interface
+Uses
+  DB,
+  ZClasses,
+  ZDataset,
+  ZConnection,
+  System.Classes;
+
+Const
+  ID_SQLSERVER = 'STANDARD';
+  ID_FIREBIRD  = 'FIREBIRD';
+  ID_MYSQL     = 'MYSQL';
+  ID_ORACLE    = 'ORACLE';
+
+  LINE_START = '<-----!';
+  LINE_FINISH = '!----->';
+
+Type
+  TArray_Str = Array Of String;
+  TTYPE_OPERATION = (TO_NONE, TO_ADD, TO_EDIT, TO_DEL);
+  TTIPO_CAMPO = (TYPE_AUTO_INC, TYPE_VARCHAR, TYPE_FLOAT, TYPE_BIT, TYPE_DATETIME, TYPE_INT, TYPE_TEXT, TYPE_IMAGE, TYPE_BLOB, TYPE_DATE, TYPE_TIME);
+  TTIPO_CONEXION = (Conn_MSACCESS, Conn_SQLSERVER, Conn_FIREBIRD, Conn_MYSQL, Conn_ORACLE, Conn_ODBC, Conn_SQLITE);
+
+  TTABLE = Class(TZTable);
+
+  TQUERY = Class(TZQuery)
+    Private
+      FTYPE_CNX : TTIPO_CONEXION;
+      FTablename : String;
+    Public
+      Property TYPE_CNX : TTIPO_CONEXION Read FTYPE_CNX Write FTYPE_CNX;
+      Property Tablename : String Read FTablename Write FTablename;
+      Constructor Create(AOwner: TComponent); Override;
+      Procedure SetFields;
+      Procedure SetCalculate(Const pName : String; pSize : Integer; pDataType : TFieldType);
+      Destructor Destroy; Override;
+  End;
+
+  TDS = Class(TDataSource)
+     Private
+       FRESPALDO : TStringList;
+       FMode_Forced : Boolean;
+     Public
+       Property Mode_Forced : Boolean Read FMode_Forced Write FMode_Forced;
+       Constructor Create(AOwner: TComponent); Override;
+       Destructor Destroy; Override;
+       Procedure RestartInfoData;
+       Procedure PutInfoData;
+       Procedure GetInfoData;
+  End;
+
+  TMANAGER_DATA = Class
+    Private
+      FDS : TDS;
+      FQR : TQUERY;
+      FPK : TArray_Str;
+      FNAME : String;
+      FORDER : String;
+      FGROUP : String;
+      FWHERE : String;
+      FERROR : Integer;
+      FFIELDS : TArray_Str;
+      FVALUES : TArray_Str;
+      FACTIVE : Boolean;
+      FCAPTION : String;
+      FACARREO : Boolean;
+      FIS_POST : Boolean;
+      FSENTENCE : String;
+      FESTACION : String;
+      FUSER_NAME : String;
+      FLAST_ERROR : String;
+      FNEW_RECORD : Boolean;
+      FLAST_ACTION : String;
+      FON_NEW_RECORD : TNotifyEvent;
+      FON_AFTER_POST : TNotifyEvent;
+      FON_DATA_CHANGE : TNotifyEvent;
+      FON_BEFORE_POST : TNotifyEvent;
+      FON_STATE_CHANGE : TNotifyEvent;
+      FON_AFTER_DELETE : TNotifyEvent;
+      Procedure Put_Log(pAction: String; pQR: TQUERY);
+      Function GetActive : Boolean;
+      Procedure SetActive(Const pValue : Boolean);
+      Procedure Execute_Acarreo;
+    Public
+      Property QR : TQUERY Read FQR Write FQR;
+      Property DS : TDS    Read FDS Write FDS;
+      Property PK : TArray_Str Read FPK;
+      Property ORDER : String Read FORDER Write FORDER;
+      Property GROUP : String Read FGROUP Write FGROUP;
+      Property WHERE : String Read FWHERE Write FWHERE;
+      Property ERROR : Integer Read FERROR Write FERROR;
+      Property FIELDS : TArray_Str Read FFIELDS Write FFIELDS;
+      Property VALUES : TArray_Str Read FVALUES Write FVALUES;
+      Property ACTIVE : Boolean Read GetActive Write SetActive;
+      Property ACARREO : Boolean Read FACARREO;
+      Property IS_POST : Boolean Read FIS_POST Write FIS_POST;
+      Property SENTENCE : String Read FSENTENCE Write FSENTENCE;
+      Property ESTACION : String Read FESTACION Write FESTACION;
+      Property USER_NAME : String Read FUSER_NAME Write FUSER_NAME;
+      Property LAST_ERROR : String Read FLAST_ERROR Write FLAST_ERROR;
+      Property NEW_RECORD : Boolean Read FNEW_RECORD;
+      Property ON_NEW_RECORD : TNotifyEvent Read FON_NEW_RECORD Write FON_NEW_RECORD;
+      Property ON_AFTER_POST : TNotifyEvent Read FON_AFTER_POST Write FON_AFTER_POST;
+      Property ON_DATA_CHANGE : TNotifyEvent Read FON_DATA_CHANGE Write FON_DATA_CHANGE;
+      Property ON_BEFORE_POST : TNotifyEvent Read FON_BEFORE_POST Write FON_BEFORE_POST;
+      Property ON_STATE_CHANGE : TNotifyEvent Read FON_STATE_CHANGE Write FON_STATE_CHANGE;
+      Property ON_AFTER_DELETE : TNotifyEvent Read FON_AFTER_DELETE Write FON_AFTER_DELETE;
+      Constructor Create(Const pName, pCaption : String);
+      Destructor Destroy;
+      Function Mode_Edition : Boolean;
+      Procedure SetPK(pPK : TArray_Str);
+      Procedure BeforeInsertInfo(DataSet: TDataSet); Virtual;
+      Procedure NewRecordInfo(DataSet: TDataSet); Virtual;
+      Procedure UpdateRecordInfo(DataSet: TDataSet; UpdateKind: TUpdateKind; Var UpdateAction: TUpdateAction);
+      Procedure AfterPostInfo(DataSet: TDataSet); Virtual;
+      Procedure BeforePostInfo(DataSet: TDataSet); Virtual;
+      Procedure AfterCancelInfo(DataSet: TDataSet); Virtual;
+      Procedure BeforeEditInfo(DataSet: TDataSet); Virtual;
+      Procedure BeforeDeleteInfo(DataSet: TDataSet); Virtual;
+      Procedure AfterDeleteInfo(DataSet: TDataSet); Virtual;
+      Procedure DsDataChangeInfo(Sender: TObject; Field: TField); Virtual;
+      Procedure DsStateInfo(Sender: TObject); Virtual;
+      Procedure SetAcarreo(Const pAcarreo : Boolean; pFields, pValues: TArray_Str);
+      Procedure SetFormatNumber(Const pFieldname : String);
+  End;
+
+  TConexion = Class(TZConnection)
+    Private
+      FAUX : TQUERY;
+      FTMP : TQUERY;
+      FSQL : TQUERY;
+      FPORT : Integer;
+      FERROR : String;
+      FTABLES : TStringList;
+      FSEARCH : TMANAGER_DATA;
+      FNETWORK : String;
+      FADDRESS : String;
+      FDLL_DATABASE : String;
+      FDB_PORT         : Integer;
+      FDB_DATABASE     : String;
+      FDB_USERNAME     : String;
+      FDB_PASSWORD     : String;
+      FDB_SERVERNAME   : String;
+      FDB_WORKSTATION  : String;
+      FAPP_USERNAME    : String;
+      FAPP_WORKSTATION : String;
+      FTYPE_CNX : TTIPO_CONEXION;
+      Function GetConnection : TZConnection;
+      Procedure OnBeforeConnect(Sender: TObject);
+    Public
+      Property TMP : TQUERY Read FTMP Write FTMP;
+      Property AUX : TQUERY Read FAUX Write FAUX;
+      Property SQL : TQUERY Read FSQL Write FSQL;
+      Property ERROR  : String Read FERROR;
+      Property TABLES : TStringList Read FTABLES;
+      Property SEARCH : TMANAGER_DATA Read FSEARCH Write FSEARCH;
+      Property TYPE_CNX : TTIPO_CONEXION Read FTYPE_CNX Write FTYPE_CNX;
+      Function Top_Sentence(pTop : Integer) : String;
+      Function No_Lock : String;
+      Function Return_Type(pType : TTIPO_CAMPO) : String;
+      Function FOREINGKEY(pItem, pFieldSource, pTableNameDestiny, pFieldDestiny : String) : String;
+      Function Trim_Sentence(pField : String) : String;
+      Function Null_Sentence(pField : String) : String;
+      Function SubString_Sentence(pValue : String; pPos, pLen : Integer) : String;
+      Function Evaluate_Sentence(pField, pValue : String) : String;
+      Function TableExists(const pTableName: String): Boolean;
+      Function GetFileName : String;
+      Procedure SetConnection(pValue : TTIPO_CONEXION);
+      Procedure SetServer(pValue : String);
+      Procedure SetDatabase(pValue : String);
+      Procedure SetUser(pValue : String);
+      Procedure SetPassword(pValue : String);
+      Procedure SetNetwork(pValue : String);
+      Procedure SetAddress(pValue : String);
+      Procedure SetDLL_DATABASE(pValue : String);
+      Procedure SetWorkStations(pValue : String);
+      procedure SetAppUser(pValue: String);
+      Procedure SetAppWorkStations(pValue : String);
+      Procedure SetPort(pValue : Integer);
+      Constructor Create(AOwner: TComponent); override;
+      Destructor Destroy; override;
+      Function Connect(pValue  : Boolean) : Boolean;
+      Function IsConnected : Boolean;
+      Function LoadDatabase: TStringList;
+      Function LoadTablenames: TStringList;
+      Function LoadFieldsnames(pTableName : String): TStringList;
+      Function CreateTable(pSQL : TStringList) : Boolean;
+      Function There_Is_Data(Const pTablename : String) : Boolean;
+      Function DropTable(Const pTablename : String) : Boolean;
+      Function Record_Exist(Const pTablename : String; Const pField, pValue : TArray_Str) : Boolean;
+      Function Record_Insert(Const pTablename : String; Const pFieldCode, pFieldName, pValueCode, pValueName : String; Const pFields : TArray_Str = []; Const pValues : TArray_Str = []) : Boolean;
+      Function GetValue(Const pTablename : String; Const pField, pValue, pResult : TArray_Str) : String;
+      Function GetValueInt(Const pTablename : String; Const pField, pValue, pResult : TArray_Str) : Integer;
+      Function GetValueDbl(Const pTablename : String; Const pField, pValue, pResult : TArray_Str) : Double;
+      Function Next(Const pTablename : String; Const pPrefix : Char; Const pPK, pField, pValue : TArray_Str; Const pMaxWidth : Integer) : String;
+      Function Max(Const pTablename : String; Const pPK, pField, pValue : TArray_Str) : String;
+      Function Retornar_String(pTableName : String; pFields, pValues, pResults : TArray_Str; pOrigen : String; pTrim : Boolean = True) : String;
+      Function Retornar_Double(pTableName : String; pFields, pValues, pResults : TArray_Str; pOrigen : String) : Double;
+      Function SQL_Boolean(pSQL, pOrigen : String) : Boolean;
+      Function SQL_Double(Const pSQL, pFieldName, pOrigen : String): Double;
+      Procedure BeginTrans;
+      Procedure CommitTrans;
+      Procedure RollbackTrans;
+  End;
+
+//Var
+//  gConexion : TConexion;
+
+implementation
+Uses
+  StrUtils,
+  Vcl.Forms,
+  Utils.Log,
+  Vcl.Dialogs,
+  System.Types,
+  ZDatasetUtils,
+  Winapi.Windows,
+  ZCompatibility,
+  Winapi.Winsock,
+  System.IOUtils,
+  Winapi.WinSpool,
+  Utils.Functions,
+  System.SysUtils,
+  ZAbstractDataset,
+  ZAbstractRODataset,
+  ZAbstractConnection;
+
+Function TConexion.GetFileName : String;
+Begin
+  Result := ChangeFileExt(Application.ExeName, '.dll');
+End;
+
+constructor TConexion.Create(AOwner: TComponent);
+Begin
+  Inherited Create(AOwner);
+  Try
+    Self.LoginPrompt := False;
+    FTABLES := TStringList.Create;
+    FSQL := TQUERY.Create(Nil);
+    FSQL.Connection := Self;
+    FAUX := TQUERY.Create(Nil);
+    FAUX.Connection := Self;
+    FTMP := TQUERY.Create(Nil);
+    FTMP.Connection := Self;
+  Except
+    On E:Exception Do
+      ShowMessage(E.Message);
+  End;
+End;
+
+Function TConexion.Top_Sentence(pTop : Integer) : String;
+Begin
+  Result :=  ' ';
+  If pTop <= 0 Then
+    Exit;
+  Result :=  ' TOP ' + IntToStr(pTop);
+  If FTYPE_CNX = Conn_ORACLE Then
+    Result :=  ' TOP ' + IntToStr(pTop)
+  Else
+    If FTYPE_CNX = Conn_FIREBIRD Then
+      Result :=  ' FIRST ' + IntToStr(pTop);
+End;
+
+Function TConexion.No_Lock : String;
+Begin
+  Result :=  ' ';
+  If FTYPE_CNX = Conn_SQLSERVER Then
+    Result :=  ' (NOLOCK) ';
+End;
+
+Function TConexion.Return_Type(pType : TTIPO_CAMPO) : String;
+Begin
+  Result := '';
+  case pType of
+    TYPE_AUTO_INC   : Begin
+                        Result := Return_Type(TYPE_INT);
+                        If FTYPE_CNX = Conn_SQLSERVER Then
+                          Result := ' INT IDENTITY(1,1) ' ;
+                      End;
+    TYPE_VARCHAR    : Begin
+                        Result := 'VARCHAR';
+                      End;
+    TYPE_FLOAT      : Begin
+                        Result := 'FLOAT';
+                      End;
+    TYPE_BIT        : Begin
+                        Result := 'BIT';
+                        If FTYPE_CNX = Conn_ORACLE Then
+                          Result := 'NUMBER(1)';
+                      End;
+    TYPE_TIME       : Begin
+                        Result := 'DATETIME';
+                        If FTYPE_CNX = Conn_ORACLE Then
+                          Result := 'TIME'
+                        Else
+                          If FTYPE_CNX = Conn_FIREBIRD Then
+                            Result := 'TIME';
+                      End;
+    TYPE_DATE       ,
+    TYPE_DATETIME   : Begin
+                        Result := 'DATETIME';
+                        If FTYPE_CNX = Conn_ORACLE Then
+                          Result := 'DATE'
+                        Else
+                          If FTYPE_CNX = Conn_FIREBIRD Then
+                            Result := 'DATE';
+                      End;
+    TYPE_INT        : Begin
+                        Result := 'INT';
+                        If FTYPE_CNX = Conn_ORACLE Then
+                          Result := 'NUMBER(38)';
+                      End;
+    TYPE_TEXT       : Begin
+                        Result := 'TEXT';
+                        If FTYPE_CNX = Conn_ORACLE Then
+                          Result := 'CLOB'
+                        Else
+                          If FTYPE_CNX = Conn_FIREBIRD Then
+                            Result := 'BLOB';
+                      End;
+    TYPE_IMAGE      : Begin
+                        Result := 'IMAGE';
+                        If FTYPE_CNX = Conn_ORACLE Then
+                          Result := 'BLOB'
+                        Else
+                          If (FTYPE_CNX = Conn_FIREBIRD) Or (FTYPE_CNX = Conn_MYSQL) Then
+                            Result := 'BLOB';
+                      End;
+    TYPE_BLOB       : Begin
+                        Result := 'TEXT';
+                        If (FTYPE_CNX = Conn_FIREBIRD) Or (FTYPE_CNX = Conn_MYSQL) Then
+                          Result := 'BLOB'
+                        Else
+                          If (FTYPE_CNX = Conn_SQLSERVER) Then
+                          Result := 'VARBINARY(MAX)';
+                      End;
+  End;
+End;
+
+Function TConexion.FOREINGKEY(pItem, pFieldSource, pTableNameDestiny, pFieldDestiny : String) : String;
+Var
+  lInt : Integer;
+  lName_Constraint : String;
+  hours, mins, secs, milliSecs : Word;
+Begin
+  DecodeTime(now, hours, mins, secs, milliSecs);
+  RandSeed := milliSecs;
+  lInt := Random(1000);
+  lInt := Random(lInt);
+  lInt := Random(lInt);
+  lName_Constraint := Copy(pItem + Trim(IntToStr(lInt)) + Trim(pFieldSource), 1, 20);
+  Result := 'CONSTRAINT ' + 'FK_' + lName_Constraint + ' FOREIGN KEY(' + Trim(pFieldSource) + ')  REFERENCES ' + pTableNameDestiny + '(' + pFieldDestiny + ')';
+End;
+
+Function TConexion.Trim_Sentence(pField : String) : String;
+Begin
+  Result := 'LTRIM(RTRIM(' + TRIM(pField) + '))';
+  If FTYPE_CNX = Conn_ORACLE Then
+    Result := 'LTRIM(RTRIM(' + TRIM(pField) + '))'
+  Else
+    If (FTYPE_CNX = Conn_FIREBIRD) Or (FTYPE_CNX = Conn_MYSQL) Then
+       Result := 'TRIM(' + TRIM(pField) + ')';
+End;
+
+Function TConexion.Null_Sentence(pField : String) : String;
+Begin
+  Result := pField + ' IS NULL';
+  If FTYPE_CNX = Conn_ORACLE Then
+    Result := pField + ' IS NULL'
+  Else
+    If FTYPE_CNX = Conn_FIREBIRD Then
+      Result := pField + ' IS NULL';
+End;
+
+Function TConexion.SubString_Sentence(pValue : String; pPos, pLen : Integer) : String;
+Begin
+  Result := ' SUBSTRING(' + pValue + ', ' + IntToStr(pPos) + ', ' + IntToStr(pLen) + ')';
+  If FTYPE_CNX = Conn_ORACLE Then
+    Result := ' SUBSTRING(' + pValue + ', ' + IntToStr(pPos) + ', ' + IntToStr(pLen) + ')'
+  Else
+    If FTYPE_CNX = Conn_FIREBIRD Then
+      Result := ' SUBSTRING(' + pValue + ' FROM ' + IntToStr(pPos) + ' FOR ' + IntToStr(pLen) + ')';
+End;
+
+Function TConexion.Evaluate_Sentence(pField, pValue : String) : String;
+Begin
+  Result := Trim_Sentence(pField) + ' = ' + QuotedStr(Trim((pValue)));
+  If Vacio(pValue) Then
+    Result := Result  + ' OR ' + pField  + ' IS NULL '  ;
+  Result :=  '(' + Result + ')';
+End;
+
+Function TConexion.TableExists(const pTableName: String): Boolean;
+begin
+  Result := Assigned(FTABLES) And (FTABLES.IndexOf(pTableName) > -1);
+end;
+
+procedure TConexion.BeginTrans;
+begin
+  Self.StartTransaction
+end;
+
+procedure TConexion.CommitTrans;
+begin
+  Self.Commit;
+end;
+
+Function TConexion.Connect(pValue  : Boolean) : Boolean;
+begin
+  Try
+    Self.Connected := False;
+    Case FTYPE_CNX Of
+      Conn_MSACCESS  : Begin
+                       End;
+      Conn_ODBC      : Begin
+                       End;
+      Conn_SQLITE    : Begin
+                       End;
+      Conn_SQLSERVER : Begin
+//                         If Self.Version <> IntToStr(ZEOS_MAJOR_VERSION) Then
+//                         Else
+                         Self.Protocol         := 'mssql';
+                         Self.Protocol         := 'FreeTDS_MsSQL>=2005';
+                         Self.Catalog          := FDB_DATABASE;
+                         Self.Database         := FDB_DATABASE;
+                         Self.HostName         := FDB_SERVERNAME;
+                         Self.Port             := FDB_PORT;
+                         If Self.Port <= 0 Then
+                           Self.Port := 1433;
+                         Self.User             := FDB_USERNAME;
+                         Self.Password         := FDB_PASSWORD;
+                         Self.LibraryLocation  := 'E:\borrar\TestZEOS\x86\libsybdb-5.dll';
+                         Self.LibraryLocation  := 'D:\Proyectos\DelphiXE\A_ThirdPart\CatalogRepository\ZeosLib\freetds-0.95.87\32 Bits\sybdb.dll';
+                         Self.LibraryLocation  := Trim(FDLL_DATABASE);
+                         Self.AutoCommit       := True;
+                         Self.ControlsCodePage := TZControlsCodePage.cGET_ACP;
+                         Self.ControlsCodePage := TZControlsCodePage.cCP_UTF16;
+//                       Self.ControlsCodePage := TZControlsCodePage.cCP_UTF8;
+                         Self.SQLHourGlass     := False;
+                       End;
+      Conn_MYSQL     : ;
+      Conn_ORACLE    : ;
+    End;
+    Self.LoginPrompt := False;
+    Self.BeforeConnect := Self.OnBeforeConnect;
+    Self.Connected := pValue;
+    Result := Self.Connected;
+    If Result Then
+      FTABLES := Self.LoadTablenames;
+  Except
+    On E:Exception Do
+    Begin
+      FERROR := 'FCNX.Connected, pValue = ' + BoolToStr(pValue) + ', ' + E.Message;
+      UtLog_Execute(FERROR);
+    End;
+  End;
+end;
+
+Function TConexion.IsConnected : Boolean;
+Begin
+  Result := Assigned(Self) And Self.Connected;
+End;
+
+function TConexion.GetConnection: TZConnection;
+begin
+  Result := Nil;
+//  If Assigned(FCNX) Then
+//    Result := FCNX;
+end;
+
+Function TConexion.LoadDatabase: TStringList;
+begin
+  Result := TStringList.Create;
+  Self.GetCatalogNames(Result);
+end;
+
+Function TConexion.LoadTablenames: TStringList;
+begin
+  Result := TStringList.Create;
+  Self.GetTableNames('', Result);
+end;
+
+Function TConexion.LoadFieldsnames(pTableName : String): TStringList;
+begin
+  Result := TStringList.Create;
+  Self.GetColumnNames(pTableName, '', Result);
+end;
+
+procedure TConexion.OnBeforeConnect(Sender: TObject);
+begin
+
+end;
+
+procedure TConexion.SetAddress(pValue: String);
+begin
+  FADDRESS := Trim(pValue);
+end;
+
+procedure TConexion.SetConnection(pValue: TTIPO_CONEXION);
+begin
+  FTYPE_CNX := pValue;
+end;
+
+procedure TConexion.SetDatabase(pValue: String);
+begin
+  FDB_DATABASE := Trim(pValue);
+end;
+
+procedure TConexion.SetNetwork(pValue: String);
+begin
+  FNETWORK := Trim(pValue);
+end;
+
+procedure TConexion.SetPassword(pValue: String);
+begin
+  FDB_PASSWORD := Trim(pValue);
+end;
+
+procedure TConexion.SetServer(pValue: String);
+begin
+  FDB_SERVERNAME := Trim(pValue);
+end;
+
+procedure TConexion.SetUser(pValue: String);
+begin
+  FDB_USERNAME := Trim(pValue);
+end;
+
+procedure TConexion.SetWorkStations(pValue: String);
+begin
+  FDB_WORKSTATION := Trim(pValue);
+end;
+
+procedure TConexion.SetAppUser(pValue: String);
+begin
+  FAPP_USERNAME := Trim(pValue);
+end;
+
+procedure TConexion.SetAppWorkStations(pValue: String);
+begin
+  FAPP_WORKSTATION := Trim(pValue);
+end;
+
+procedure TConexion.SetDLL_DATABASE(pValue: String);
+begin
+  FDLL_DATABASE := Trim(pValue);
+end;
+
+
+Procedure TConexion.SetPort(pValue : Integer);
+Begin
+  FPORT := pValue;
+End;
+
+Function TConexion.CreateTable(pSQL : TStringList) : Boolean;
+Begin
+  Result := False;
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Assign(pSQL);
+    FSQL.ExecSQL;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    Result := True;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.CreateTable, ' + E.Message);
+  End;
+End;
+
+Function TConexion.There_Is_Data(Const pTablename : String) : Boolean;
+Begin
+  Result := False;
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT COUNT(*) AS RESULTADO FROM  ' + pTablename + ' ' + No_Lock + ' ');
+    FSQL.Active := True;
+    Result := FSQL.Active And (FSQL.FieldByName('RESULTADO').AsInteger > 0);
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.There_Is_Data, ' + E.Message);
+  End;
+End;
+
+Function TConexion.DropTable(Const pTablename : String) : Boolean;
+Var
+  lTables : TStringList;
+Begin
+  Result := False;
+  Try
+//    lTables := Self.LoadTablenames;
+//    If Assigned(lTables) Then
+//    Begin
+//      lExists := False;
+//      lI := 0;
+//      While (lI < lTables.Count) And (Not lExists) Do
+//      Begin
+//        lExists := lTables[lI] = pTablename;
+//        Inc(lI);
+//      End;
+//      If lExists Then
+      Begin
+        FSQL.Active := False;
+        FSQL.SQL.Clear;
+        FSQL.SQL.Add('Drop table ' + pTablename);
+        FSQL.ExecSQL;
+        Result := True;
+        FSQL.Active := False;
+        FSQL.SQL.Clear;
+      End;
+//      lTables.Clear;
+//      FreeAndNil(lTables);
+//    End;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.DropTable, ' + E.Message);
+  End;
+End;
+
+Function TConexion.Record_Exist(Const pTablename : String; Const pField, pValue : TArray_Str) : Boolean;
+Var
+  lI : Integer;
+  ltmp : String;
+Begin
+  ltmp := '';
+  For lI := Low(pField) To High(pField) Do
+    ltmp := ltmp + IfThen(Not Vacio(ltmp), ', ') + pField[lI];
+  Result := False;
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT ' + ltmp + ' FROM ' + pTablename + ' ' + ' ' + No_Lock + ' ');
+    For lI := Low(pField) To High(pField) Do
+      FSQL.SQL.Add(IfThen(lI = Low(pField), ' WHERE ', ' AND ') + Trim_Sentence(pField[lI]) + ' = ' + QuotedStr(Trim(pValue[lI])));
+    FSQL.Active := True;
+    Result := FSQL.Active And (FSQL.RecordCount > 0);
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.Record_Exist, ' + E.Message);
+  End;
+End;
+
+Function TConexion.Record_Insert(Const pTablename : String; Const pFieldCode, pFieldName, pValueCode, pValueName : String; Const pFields : TArray_Str = []; Const pValues : TArray_Str = []) : Boolean;
+Var
+  lI : Integer;
+Begin
+  Result := False;
+  If Vacio(pValueCode) Or Vacio(pValueName) Then
+    Exit;
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT * FROM ' + pTablename + ' ' + ' ' + No_Lock + ' ');
+    FSQL.SQL.Add(' WHERE ' + Trim_Sentence(pFieldCode) + ' = ' + QuotedStr(Trim(pValueCode)) + ' ');
+    FSQL.Active := True;
+    If FSQL.Active Then
+    Begin
+      If FSQL.RecordCount <= 0 Then
+      Begin
+        FSQL.Append;
+        FSQL.FieldByName(pFieldCode).AsString := pValueCode;
+      End
+      Else
+      Begin
+        FSQL.Edit;
+      End;
+      FSQL.FieldByName(pFieldName).AsString := AnsiUpperCase(Trim(pValueName));
+      For lI := Low(pFields) To High(pFields) Do
+        FSQL.FieldByName(pFields[lI]).AsString := AnsiUpperCase(Trim(pValues[lI]));
+      FSQL.Post;
+      Result := True;
+    End;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.Record_Exist, ' + E.Message);
+  End;
+End;
+
+Function TConexion.GetValue(Const pTablename : String; Const pField, pValue, pResult : TArray_Str) : String;
+Var
+  lI : Integer;
+  ltmp : String;
+Begin
+  ltmp := '';
+  Result := '';
+  For lI := Low(pResult) To High(pResult) Do
+    ltmp := ltmp + IfThen(Not Vacio(ltmp), ', ') + pResult[lI];
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT ' + ltmp + ' FROM ' + pTablename + ' ' + ' ' + No_Lock + ' ');
+    For lI := Low(pField) To High(pField) Do
+      FSQL.SQL.Add(IfThen(lI = Low(pField), ' WHERE ', ' AND ') + Trim_Sentence(pField[lI]) + ' = ' + QuotedStr(Trim(pValue[lI])));
+    FSQL.Active := True;
+    If FSQL.Active And (FSQL.RecordCount > 0) Then
+    Begin
+      FSQL.First;
+      While Not FSQL.Eof Do
+      Begin
+        For lI := Low(pResult) To High(pResult) Do
+          Result := Result + IfThen(Not Vacio(Result),  ' ') + FSQL.FieldByName(pResult[lI]).AsString;
+        FSQL.Next;
+      End;
+    End;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.GetValue, ' + E.Message);
+  End;
+End;
+
+Function TConexion.GetValueInt(Const pTablename : String; Const pField, pValue, pResult : TArray_Str) : Integer;
+Var
+  lI : Integer;
+  ltmp : String;
+Begin
+  ltmp := '';
+  Result := 0;
+  For lI := Low(pResult) To High(pResult) Do
+    ltmp := ltmp + IfThen(Not Vacio(ltmp), ', ') + pResult[lI];
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT ' + ltmp + ' FROM ' + pTablename + ' ' + ' ' + No_Lock + ' ');
+    For lI := Low(pField) To High(pField) Do
+      FSQL.SQL.Add(IfThen(lI = Low(pField), ' WHERE ', ' AND ') + Trim_Sentence(pField[lI]) + ' = ' + QuotedStr(Trim(pValue[lI])));
+    FSQL.Active := True;
+    If FSQL.Active And (FSQL.RecordCount > 0) Then
+    Begin
+      FSQL.First;
+      While Not FSQL.Eof Do
+      Begin
+        For lI := Low(pResult) To High(pResult) Do
+        Result := Result + FSQL.FieldByName(pResult[lI]).AsInteger;
+        FSQL.Next;
+      End;
+    End;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.GetValueInt, ' + E.Message);
+  End;
+End;
+
+Function TConexion.GetValueDbl(Const pTablename : String; Const pField, pValue, pResult : TArray_Str) : Double;
+Var
+  lI : Integer;
+  ltmp : String;
+Begin
+  ltmp := '';
+  Result := 0;
+  For lI := Low(pResult) To High(pResult) Do
+    ltmp := ltmp + IfThen(Not Vacio(ltmp), ', ') + pResult[lI];
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT ' + ltmp + ' FROM ' + pTablename + ' ' + ' ' + No_Lock + ' ');
+    For lI := Low(pField) To High(pField) Do
+      FSQL.SQL.Add(IfThen(lI = Low(pField), ' WHERE ', ' AND ') + Trim_Sentence(pField[lI]) + ' = ' + QuotedStr(Trim(pValue[lI])));
+    FSQL.Active := True;
+    If FSQL.Active And (FSQL.RecordCount > 0) Then
+    Begin
+      FSQL.First;
+      While Not FSQL.Eof Do
+      Begin
+        For lI := Low(pResult) To High(pResult) Do
+        Result := Result + FSQL.FieldByName(pResult[lI]).AsFloat;
+        FSQL.Next;
+      End;
+    End;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.GetValueDbl, ' + E.Message);
+  End;
+End;
+
+Function TConexion.Next(Const pTablename : String; Const pPrefix : Char; Const pPK, pField, pValue : TArray_Str; Const pMaxWidth : Integer) : String;
+Var
+  lI : Integer;
+Begin
+  Result := Justificar('', pPrefix, pMaxWidth);
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT ');
+    For lI := Low(pPK) To High(pPK) Do
+      FSQL.SQL.Add(' MAX( ' + pPK[lI] + ' ) AS RESULTADO ');
+    FSQL.SQL.Add(' FROM ' + pTablename + ' ' + No_Lock + ' ');
+    If High(pField) > -1 Then
+    Begin
+      For lI := Low(pField) To High(pField) Do
+        FSQL.SQL.Add(IfThen(lI = Low(pField), ' WHERE ', ' AND ') + Trim_Sentence(pField[lI]) + ' = ' + QuotedStr(Trim(pValue[lI])));
+    End;
+    FSQL.Active := True;
+    If FSQL.Active And (FSQL.RecordCount > 0) And (Not Vacio(FSQL.FieldByName('RESULTADO').AsString)) Then
+      Result := FSQL.FieldByName('RESULTADO').AsString;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.Next, ' + E.Message);
+  End;
+  Next_Value(Result);
+End;
+
+Function TConexion.Max(Const pTablename : String; Const pPK, pField, pValue : TArray_Str) : String;
+Var
+  lI : Integer;
+Begin
+  Result := '';
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT ');
+    For lI := Low(pPK) To High(pPK) Do
+      FSQL.SQL.Add(' MAX( ' + pPK[lI] + ' ) AS RESULTADO ');
+    FSQL.SQL.Add(' FROM ' + pTablename + ' ' + No_Lock + ' ');
+    If High(pField) > -1 Then
+    Begin
+      For lI := Low(pField) To High(pField) Do
+        FSQL.SQL.Add(IfThen(lI = Low(pField), ' WHERE ', ' AND ') + Trim_Sentence(pField[lI]) + ' = ' + QuotedStr(Trim(pValue[lI])));
+    End;
+    FSQL.Active := True;
+    If FSQL.Active And (FSQL.RecordCount > 0) And (Not Vacio(FSQL.FieldByName('RESULTADO').AsString)) Then
+      Result := FSQL.FieldByName('RESULTADO').AsString;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.Max, ' + E.Message);
+  End;
+  Next_Value(Result);
+End;
+
+Function TConexion.Retornar_String(pTableName : String; pFields, pValues, pResults : TArray_Str; pOrigen : String; pTrim : Boolean = True) : String;
+Begin
+  Result := GetValue(pTablename, pFields, pValues, pResults);
+End;
+
+procedure TConexion.RollbackTrans;
+begin
+  Self.Rollback;
+end;
+
+Function TConexion.Retornar_Double(pTableName : String; pFields, pValues, pResults : TArray_Str; pOrigen : String) : Double;
+Begin
+  Result := GetValueDbl(pTablename, pFields, pValues, pResults);
+End;
+
+Function TConexion.SQL_Boolean(pSQL, pOrigen : String) : Boolean;
+Begin
+  Result := False;
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.Active := False;
+    FSQL.SQL.Add(pSQL);
+    UtLog_Execute('TConexion.SQL_Boolean, ' + pOrigen + ', ' + FSQL.SQL.Text);
+    FSQL.ExecSQL;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    Result := True;
+  Except
+    On E : Exception Do
+      UtLog_Execute('TConexion.SQL_Boolean, ' + pOrigen + ', ' + E.Message);
+  End;
+End;
+
+function TConexion.SQL_Double(Const pSQL, pFieldName, pOrigen : String): Double;
+Var
+  lSQL : TQuery;
+Begin
+  Result := 0;
+  Try
+    lSQL := TQuery.Create(Nil);
+    lSQL.Active := False;
+    lSQL.Connection := Self;
+    lSQL.SQL.Add(pSQL);
+    UtLog_Execute('Execute_SQL_Double, ' + pOrigen + ', ' + lSQL.SQL.Text);
+    lSQL.Active := True ;
+    If lSQL.Active And (lSQL.RecordCount > 0) Then
+      Result := lSQL.FieldByName(pFieldName).AsFloat;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FreeAndNil(lSQL);
+  Except
+    On E : Exception Do
+      UtLog_Execute('TConexion.SQL_Double, ' + pOrigen + ', ' + E.Message);
+  End;
+End;
+
+destructor TConexion.Destroy;
+begin
+  If Assigned(FTMP) Then
+  Begin
+    FTMP.Active := False;
+    FreeAndNil(FTMP);
+  End;
+
+  If Assigned(FSQL) Then
+  Begin
+    FSQL.Active := False;
+    FreeAndNil(FSQL);
+  End;
+
+  If Assigned(FAUX) Then
+  Begin
+    FAUX.Active := False;
+    FreeAndNil(FAUX);
+  End;
+
+  If Assigned(FTABLES) Then
+  Begin
+    FTABLES.Clear;
+    FreeAndNil(FTABLES);
+  End;
+    If Self.Connected Then
+      Self.Connected := False;
+end;
+
+{ TQUERY }
+constructor TQUERY.Create(AOwner: TComponent);
+begin
+  Inherited;
+  Self.UpdateMode := TZUpdateMode.umUpdateChanged;
+  Self.Name := 'TQUERY_' + FormatDateTime('YYYYMMDDHHNNSSZZZ', Now) + '_' + IntToStr(GetTickCount);
+end;
+
+Procedure TQUERY.SetFields;
+Var
+  lI : Integer;
+  lSQL : TQUERY;
+  lFieldStr     : TStringField;
+  lFieldInt     : TIntegerField;
+  lFieldDbl     : TFloatField;
+  lFieldMem     : TMemoField;
+  lFieldWide    : TWideStringField;
+  lFieldWideMem : TWideMemoField;
+Begin
+  Try
+    lSQL := TQUERY.Create(Nil);
+    If FTYPE_CNX = Conn_SQLSERVER Then
+      lSQL.SQL.Add(' SELECT * FROM ' + FTablename + ' ' + ' (NOLOCK) ')
+    Else
+      lSQL.SQL.Add(' SELECT * FROM ' + FTablename + ' ' + ' ');
+    lSQL.Connection := Self.Connection;
+    lSQL.Active := True;
+    If lSQL.Active Then
+    Begin
+      For lI := 0 To lSQL.Fields.Count-1 Do
+      Begin
+        Case lSQL.Fields[lI].DataType Of
+          ftString     : Begin
+                           lFieldStr := TStringField.Create(Self);
+                           lFieldStr.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldStr.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldStr.Size      := lSQL.Fields[lI].Size     ;
+                           lFieldStr.DataSet   := Self;
+                         End;
+          ftWideString : Begin
+                           lFieldWide := TWideStringField.Create(Self);
+                           lFieldWide.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldWide.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldWide.Size      := lSQL.Fields[lI].Size     ;
+                           lFieldWide.DataSet   := Self;
+                         End;
+          ftInteger     ,
+          ftSmallint   : Begin
+                           lFieldInt := TIntegerField.Create(Self);
+                           lFieldInt.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldInt.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldInt.DataSet   := Self;
+                         End;
+          ftFloat      : Begin
+                           lFieldDbl := TFloatField.Create(Self);
+                           lFieldDbl.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldDbl.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldDbl.DataSet   := Self;
+                         End;
+          ftMemo       : Begin
+                           lFieldMem := TMemoField.Create(Self);
+                           lFieldMem.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldMem.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldMem.DataSet   := Self;
+                         End;
+          ftWideMemo   : Begin
+                           lFieldWideMem := TWideMemoField.Create(Self);
+                           lFieldWideMem.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldWideMem.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldWideMem.DataSet   := Self;
+                         End;
+        End;
+      End;
+    End;
+    lSQL.Active := False;
+    FreeAndNil(lSQL);
+  Except
+    On E: Exception Do
+    Begin
+      UtLog_Execute('TQUERY.SetFields, ' + E.Message);
+    End;
+  End;
+End;
+
+Procedure TQUERY.SetCalculate(Const pName : String; pSize : Integer; pDataType : TFieldType);
+Var
+  lFieldStr     : TStringField;
+  lFieldInt     : TIntegerField;
+  lFieldDbl     : TFloatField;
+  lFieldMem     : TMemoField;
+  lFieldWide    : TWideStringField;
+  lFieldWideMem : TWideMemoField;
+Begin
+  Try
+    Case pDataType Of
+      ftString     : Begin
+                       lFieldStr := TStringField.Create(Self);
+                       lFieldStr.FieldName  := pName;
+                       lFieldStr.FieldKind  := TFieldKind.fkCalculated;
+                       lFieldStr.Size       := pSize;
+                       lFieldStr.Calculated := True;
+                       lFieldStr.DataSet    := Self;
+                     End;
+      ftWideString : Begin
+                       lFieldWide := TWideStringField.Create(Self);
+                       lFieldWide.FieldName  := pName;
+                       lFieldWide.FieldKind  := TFieldKind.fkCalculated;
+                       lFieldWide.Size       := pSize;
+                       lFieldWide.Calculated := True;
+                       lFieldWide.DataSet    := Self;
+                     End;
+      ftInteger     ,
+      ftSmallint   : Begin
+                       lFieldInt := TIntegerField.Create(Self);
+                       lFieldInt.FieldName  := pName;
+                       lFieldInt.FieldKind  := TFieldKind.fkCalculated;
+                       lFieldInt.Calculated := True;
+                       lFieldInt.DataSet    := Self;
+                     End;
+      ftFloat      : Begin
+                       lFieldDbl := TFloatField.Create(Self);
+                       lFieldDbl.FieldName  := pName;
+                       lFieldDbl.FieldKind  := TFieldKind.fkCalculated;
+                       lFieldDbl.Calculated := True;
+                       lFieldDbl.DataSet    := Self;
+                     End;
+      ftMemo       : Begin
+                       lFieldMem := TMemoField.Create(Self);
+                       lFieldMem.FieldName  := pName;
+                       lFieldMem.FieldKind  := TFieldKind.fkCalculated;
+                       lFieldMem.Calculated := True;
+                       lFieldMem.DataSet    := Self;
+                     End;
+      ftWideMemo   : Begin
+                       lFieldWideMem := TWideMemoField.Create(Self);
+                       lFieldWideMem.FieldName  := pName;
+                       lFieldWideMem.FieldKind  := TFieldKind.fkCalculated;
+                       lFieldWideMem.Calculated := True;
+                       lFieldWideMem.DataSet    := Self;
+                     End;
+    End;
+  Except
+    On E: Exception Do
+    Begin
+      UtLog_Execute('TQUERY.SetCalculate, ' + E.Message);
+    End;
+  End;
+End;
+
+destructor TQUERY.Destroy;
+begin
+//  If Assigned(Self.Connection) Then
+//  Begin
+//    Self.Connection.Connected := False;
+//    Self.Connection.DisposeOf;
+//  End;
+  If Self.Active Then
+    Self.Active := False;
+  Inherited;
+end;
+
+
+//Initialization
+//  gConexion := TConexion.Create(Nil);
+//  gConexion.ConnectionString := 'Provider=Microsoft.Jet.OLEDB.4.0; Data Source=' + IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'data.mdb;';
+
+//Finalization
+//  gConexion.Connect(False);
+//  gConexion.DisposeOf;
+
+{ TMANAGER_DATA }
+
+Procedure TMANAGER_DATA.Put_Log(pAction: String; pQR: TQUERY);
+Var
+  lI: Integer;
+  lLog : String;
+  lTexto : String;
+Begin
+  Try
+    If Assigned(Self.FQR.Connection) And Vacio(FUSER_NAME) Then
+      FUSER_NAME := TConexion(Self.FQR.Connection).FAPP_USERNAME;
+    If Assigned(Self.FQR.Connection) And Vacio(FESTACION) Then
+      FESTACION := TConexion(Self.FQR.Connection).FAPP_WORKSTATION;
+    lTexto := '';
+    If Not Vacio(FLAST_ACTION) Then
+      UtLog_Execute(pAction + ', ' + FLAST_ACTION)
+    Else
+    Begin
+      For lI := 0 To pQR.Fields.Count - 1 Do
+        If pQR.Fields[lI].DataType In  [ftSmallint, ftString, ftWideString, ftMemo, ftWideMemo, ftFloat, ftInteger, ftCurrency] Then
+          If Not Vacio(pQR.Fields[lI].AsString) Then
+            lTexto := lTexto + IfThen(Not Vacio(lTexto), #13 + StringOfChar(' ', 22)) + Trim(pQR.Fields[lI].FullName) + ' = ' + Trim(pQR.Fields[lI].AsString) ;
+      lLog := LINE_START + #13 +
+              StringOfChar(' ', 20) + pAction                   + #13 +
+              StringOfChar(' ', 20) + 'USUARIO: '  + FUSER_NAME + #13 +
+              StringOfChar(' ', 20) + 'ESTACION: ' + FESTACION  + #13 +
+              StringOfChar(' ', 20) + 'CONTENEDOR: ' + FCAPTION  + #13 +
+              StringOfChar(' ', 22) + lTexto                    + #13 +
+              StringOfChar(' ', 20) + LINE_FINISH;
+      FLAST_ACTION := lLog;
+      UtLog_Execute(lLog);
+    End;
+  Except
+
+  End;
+End;
+
+Procedure TMANAGER_DATA.SetPK(pPK : TArray_Str);
+Begin
+  FPK := pPK;
+End;
+
+Procedure TMANAGER_DATA.BeforeInsertInfo(DataSet: TDataSet);
+Begin
+  FLAST_ACTION := '';
+  Put_Log('TMANAGER_DATA.BeforeInsertInfo', SELF.QR);
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.Execute_Acarreo;
+Var
+  lI : Integer;
+  lSQL : TQUERY;
+  lCNX : TConexion;
+Begin
+  If Not FACARREO Then
+    Exit;
+  Try
+    lCNX := TConexion(Self.FQR.Connection);
+    lSQL := TQUERY.Create(Nil);
+    lSQL.Connection := lCNX;
+    lSQL.SQL.Add(' SELECT * FROM ' + FNAME + ' ');
+    For lI := Low(FFIELDS) To High(FFIELDS) Do
+      lSQL.SQL.Add(IfThen(lI = Low(FFIELDS), ' WHERE ', ' AND ') + lCNX.Trim_Sentence(FFIELDS[lI]) + ' = ' + QuotedStr(Trim(FVALUES[lI])));
+    lSQL.Active := True;
+    If lSQL.Active And (lSQL.RecordCount > 0) Then
+    Begin
+      For lI := 0 To lSQL.Fields.Count-1 Do
+      Begin
+        If Self.QR.FindField(lSQL.Fields[lI].FullName) <> Nil Then
+          Self.QR.FieldByName(lSQL.Fields[lI].FullName).AsVariant := lSQL.FieldByName(lSQL.Fields[lI].FullName).AsVariant;
+      End;
+    End;
+    lSQL.Active := False;
+    FreeAndNil(lSQL);
+  Except
+    On E: Exception Do
+      UtLog_Execute('TMANAGER_DATA.Execute_Acarreo, ' + E.Message);
+  End;
+End;
+
+Procedure TMANAGER_DATA.NewRecordInfo(DataSet: TDataSet);
+Begin
+  FLAST_ACTION := '';
+  Put_Log('TMANAGER_DATA.NewRecordInfo', SELF.QR);
+  DS.RestartInfoData;
+  FNEW_RECORD := True;
+  Execute_Acarreo;
+  If Assigned(FON_NEW_RECORD) Then
+    FON_NEW_RECORD(DataSet);
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.UpdateRecordInfo(DataSet: TDataSet; UpdateKind: TUpdateKind; Var UpdateAction: TUpdateAction);
+Begin
+  FLAST_ACTION := '';
+  Put_Log('TMANAGER_DATA.UpdateRecordInfo', SELF.QR);
+  UpdateAction := TUpdateAction.uaApplied;
+  Inherited;
+End;
+
+
+Procedure TMANAGER_DATA.AfterPostInfo(DataSet: TDataSet);
+Begin
+  FLAST_ACTION := '';
+  Put_Log('TMANAGER_DATA.AfterPostInfo', SELF.QR);
+  If Assigned(FON_AFTER_POST) Then
+    FON_AFTER_POST(DataSet);
+  FIS_POST := False;
+  FNEW_RECORD := False;
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.BeforePostInfo(DataSet: TDataSet);
+Begin
+//FIS_UPDATING := True;
+  DS.GetInfoData;
+  FLAST_ACTION := '';
+  FERROR := 0;
+  Put_Log('TMANAGER_DATA.BeforePostInfo', SELF.QR);
+  If Assigned(ON_BEFORE_POST) Then
+    ON_BEFORE_POST(DataSet);
+  If FERROR <> 0 Then
+      Abort;
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.AfterCancelInfo(DataSet: TDataSet);
+Begin
+  FLAST_ACTION := '';
+  FIS_POST := False;
+  FNEW_RECORD := False;
+  Put_Log('TMANAGER_DATA.AfterCancelInfo', SELF.QR);
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.BeforeEditInfo(DataSet: TDataSet);
+Begin
+  FLAST_ACTION := '';
+  Put_Log('TMANAGER_DATA.BeforeEditInfo', SELF.QR);
+  DS.RestartInfoData;
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.BeforeDeleteInfo(DataSet: TDataSet);
+Begin
+  FLAST_ACTION := '';
+  Put_Log('TMANAGER_DATA.BeforeDeleteInfo', SELF.QR);
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.AfterDeleteInfo(DataSet: TDataSet);
+Begin
+  Put_Log('TMANAGER_DATA.AfterDeleteInfo', SELF.QR);
+  If Assigned(FON_AFTER_DELETE) Then
+    FON_AFTER_DELETE(DataSet);
+  Inherited;
+  FLAST_ACTION := '';
+End;
+
+Procedure TMANAGER_DATA.DsDataChangeInfo(Sender: TObject; Field: TField);
+Begin
+  If FIS_POST Then
+    Exit;
+  If Mode_Edition Then
+  Begin
+    DS.PutInfoData;
+  End;
+  If Assigned(FON_DATA_CHANGE) Then
+    FON_DATA_CHANGE(Sender);
+//Put_Log('TMANAGER_DATA.DsDataChangeInfo', SELF.QR);
+
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.DsStateInfo(Sender: TObject);
+Begin
+//Put_Log('TMANAGER_DATA.DsStateInfo', SELF.QR);
+  If Assigned(FON_STATE_CHANGE) Then
+    FON_STATE_CHANGE(Sender);
+  Inherited;
+End;
+
+Procedure TMANAGER_DATA.SetAcarreo(Const pAcarreo : Boolean; pFields, pValues: TArray_Str);
+begin
+  FFIELDS  := pFields;
+  FVALUES  := pValues;
+  FACARREO := pAcarreo;
+  If pAcarreo And Mode_Edition then
+    FQR.Cancel;
+end;
+
+Procedure TMANAGER_DATA.SetActive(Const pValue : Boolean);
+Begin
+  Try
+     FQR.Active := False;
+     FQR.SQL.Clear;
+     FQR.SQL.Add(FSENTENCE);
+     If Not Vacio(FWHERE) Then
+       FQR.SQL.Add(FWHERE);
+     If Not Vacio(FGROUP) Then
+       FQR.SQL.Add(FGROUP);
+     If Not Vacio(FORDER) Then
+       FQR.SQL.Add(FORDER);
+     FQR.Active := pValue;
+  Except
+    On E: Exception Do
+    Begin
+      UtLog_Execute('TMANAGER_DATA.Active, ' + E.Message);
+    End;
+  End;
+  FACTIVE := FQR.Active;
+End;
+
+
+procedure TMANAGER_DATA.SetFormatNumber(Const pFieldname : String);
+begin
+  If Self.QR.FindField(pFieldname) <> Nil Then
+    TFloatField(Self.QR.FieldByName(pFieldname)).DisplayFormat := '###,###,###,##0.#0';
+end;
+
+Constructor TMANAGER_DATA.Create(Const pName, pCaption : String);
+begin
+  FNAME := pName;
+  FCAPTION := pCaption;
+  FQR := TQUERY.Create(Nil);
+  FDS := TDS.Create(Nil);
+  FDS.AutoEdit := False;
+  FDS.DataSet  := FQR;
+  FQR.Name := 'MD_' + FNAME + '_QR_' + FormatDateTime('YYYYMMDDHHNNSSZZZ', Now) + '_' + IntToStr(GetTickCount);
+  FDS.Name := 'MD_' + FNAME + '_DS_' + FormatDateTime('YYYYMMDDHHNNSSZZZ', Now) + '_' + IntToStr(GetTickCount);
+  FQR.BeforeInsert   :=  BeforeInsertInfo;
+  FQR.OnNewRecord    :=  NewRecordInfo   ;
+  FQR.OnUpdateRecord :=  UpdateRecordInfo   ;
+  FQR.AfterPost      :=  AfterPostInfo   ;
+  FQR.BeforePost     :=  BeforePostInfo  ;
+  FQR.AfterCancel    :=  AfterCancelInfo ;
+  FQR.BeforeEdit     :=  BeforeEditInfo  ;
+  FQR.BeforeDelete   :=  BeforeDeleteInfo;
+  FQR.AfterDelete    :=  AfterDeleteInfo ;
+  FDS.OnDataChange   :=  DsDataChangeInfo;
+  FDS.OnStateChange  :=  DsStateInfo     ;
+end;
+
+destructor TMANAGER_DATA.Destroy;
+begin
+  If Assigned(FQR) Then
+  Begin
+    FQR.Active := False;
+    FreeAndNil(FQR);
+  End;
+
+  If Assigned(FDS) Then
+  Begin
+    FreeAndNil(FDS);
+  End;
+end;
+
+function TMANAGER_DATA.GetActive: Boolean;
+begin
+  Result := Assigned(FQR) And FQR.Active;
+end;
+
+function TMANAGER_DATA.Mode_Edition : Boolean;
+begin
+  Result := Self.FDS.State In [dsInsert, dsEdit];
+end;
+
+{ TDS }
+constructor TDS.Create(AOwner: TComponent);
+begin
+  inherited;
+  FMode_Forced := True;
+  FRESPALDO := TStringList.Create;
+end;
+
+destructor TDS.Destroy;
+begin
+  If Assigned(FRESPALDO) Then
+  Begin
+    FRESPALDO.Clear;
+    FreeAndNil(FRESPALDO);
+  End;
+  inherited;
+end;
+
+Procedure TDS.RestartInfoData;
+Begin
+  If Assigned(FRESPALDO) Then
+    FRESPALDO.Clear;
+End;
+
+Procedure TDS.PutInfoData;
+Var
+  lI : Integer;
+begin
+  Try
+    If Not FMode_Forced Then
+      Exit;
+    If Assigned(Self) And Assigned(Self.DataSet) And (Self.State In [dsInsert, dsEdit]) Then
+      For lI := 0 To Self.DataSet.Fields.Count-1 Do
+        If Not Self.DataSet.Fields[lI].IsNull Then
+        Begin
+          FRESPALDO.Values[Self.DataSet.Fields[lI].FullName] := Self.DataSet.Fields[lI].AsString;
+        End;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TDS.PutInfoData, ' + E.Message);
+  End;
+end;
+
+Procedure TDS.GetInfoData;
+Var
+  lI : Integer;
+begin
+  Try
+    If (Not FMode_Forced) Then
+      Exit;
+    If Assigned(Self) And Assigned(Self.DataSet) And (Self.State In [dsInsert, dsEdit]) Then
+      For lI := 0 To FRESPALDO.Count-1 Do
+        If Not Vacio(FRESPALDO.Values[FRESPALDO.Names[lI]]) Then
+          Self.DataSet.FieldByName(FRESPALDO.Names[lI]).AsString := FRESPALDO.Values[FRESPALDO.Names[lI]];
+  Except
+    On E: Exception Do
+      UtLog_Execute('TDS.GetInfoData, ' + E.Message);
+  End;
+end;
+
+
+
+end.
+
