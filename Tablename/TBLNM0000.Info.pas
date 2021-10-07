@@ -58,6 +58,7 @@ Begin
   End;
   gInfo_Tablas.Add(lItem);
 End;
+
 Procedure Preparar_Tablas;
 Begin
   Cargar_Tablas(Id_Tabla_Cliente    , 'CLIENTE'    , 'Cliente'           , True, False, ['CODIGO_CLIENTE'  ]);
@@ -65,6 +66,7 @@ Begin
   Cargar_Tablas(Id_Tabla_Factura_Enc, 'FACTURA_ENC', 'Factura Encabezado', True, False, ['NUMERO_DOCUMENTO']);
   Cargar_Tablas(Id_Tabla_Factura_Det, 'FACTURA_DET', 'Factura Detalle'   , True, False, ['NUMERO_DOCUMENTO', 'CODIGO_PRODUCTO']);
 End;
+
 Procedure UtInfoTablas_Sort(pLista : TInfo_Tablas);
 Begin
   pLista.Sort(TComparer<TInfo_Tabla>.Construct(
@@ -74,6 +76,7 @@ Begin
               End)
               );
 End;
+
 Function UtInfoTablas_Search(pLista : TInfo_Tablas; Const pId : Integer; Var pIndex : Integer) : Boolean;
 Var
   lTarget: TInfo_Tabla;
@@ -90,6 +93,7 @@ Begin
   Result := pLista.BinarySearch(lTarget, pIndex, lComparer);
   lTarget.Free;
 End;
+
 Function Retornar_Id_Tabla(pTableName : String) : Integer;
 Var
   lI : Integer;
@@ -103,6 +107,7 @@ Begin
     Inc(lI);
   End;
 End;
+
 Function Retornar_Id_Caption(pTableName : String) : Integer;
 Var
   lI : Integer;
@@ -116,6 +121,7 @@ Begin
     Inc(lI);
   End;
 End;
+
 Function Retornar_Id_Field(pCodeField : String) : Integer;
 Var
   lI : Integer;
@@ -129,6 +135,7 @@ Begin
     Inc(lI);
   End;
 End;
+
 Function Retornar_Info_Tabla(pId : Integer) : TInfo_Tabla;
 Var
   lIndex : Integer;
@@ -137,6 +144,7 @@ Begin
   If UtInfoTablas_Search(gInfo_Tablas,  pId, lIndex) Then
     Result := gInfo_Tablas[lIndex];
 End;
+
 Procedure Retornar_Info_Tablas(pLista : TStringList; pInfo, pLimiteIni, pLimiteFin : Integer);
 Var
   lI : Integer;
@@ -150,22 +158,25 @@ Begin
     End;
   End;
 End;
+
 Procedure Retornar_Caption_Tablas(pTablas : TStrings);
 Var
   lI : Integer;
 Begin
   pTablas.Clear;
   For lI := 0 To gInfo_Tablas.Count-1 Do
-    pTablas.Add(Retornar_Info_Tabla(lI).Caption);
+    pTablas.AddObject(gInfo_Tablas[lI].Caption, gInfo_Tablas[lI]);
 End;
+
 Procedure Retornar_Name_Tablas(pTablas : TStrings);
 Var
   lI : Integer;
 Begin
   pTablas.Clear;
   For lI := 0 To gInfo_Tablas.Count-1 Do
-    pTablas.Add(Retornar_Info_Tabla(lI).Name);
+    pTablas.AddObject(gInfo_Tablas[lI].Name, gInfo_Tablas[lI]);
 End;
+
 Initialization
   gInfo_Tablas := TInfo_Tablas.Create;
   Preparar_Tablas;

@@ -4,10 +4,21 @@ interface
 Procedure Next_Value(Var pValue : String);
 Function Vacio(pCadena : String) : Boolean;
 Function Justificar(pCadena : String; pCharacter : Char; pLong : Integer; pPlace : Char = 'D') : String ;
+Function Encripta_Cadena(pCadena : String) : String;
+Function Desencripta_Cadena(pCadena : String) : String;
+Function SiNo(pCadena : String) : Boolean;
+Procedure Mensajes(pCadena : String);
+Function SetToFloat(Const pValue : String) : Double;
 
 implementation
 Uses
+  Dialogs,
+  Vcl.Controls,
   System.SysUtils;
+
+Const
+  Const_Semillas = '/\ :;.=zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876543210-';
+  Const_Letrados = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz=.;: \/';
 
 
 Procedure Next_Alpha(Var pValue : String; pIndex : Integer);
@@ -112,5 +123,55 @@ Begin
   End ;
   Result := lCadena;
 End;
+
+Function Encripta_Cadena(pCadena : String) : String;
+Var
+  lI : Integer;
+  lPos : Integer;
+  lCadena : String;
+Begin
+  Result := '';
+  lCadena := Trim(pCadena);
+  for lI := 1 to Length(lCadena) do
+  Begin
+    lPos := Pos(lCadena[lI], Const_Letrados);
+    Result := Result + Const_Semillas[lPos];
+  End;
+  Result := Trim(Result);
+End;
+
+Function Desencripta_Cadena(pCadena : String) : String;
+Var
+  lI : Integer;
+  lPos : Integer;
+  lCadena : String;
+Begin
+  Result := '';
+  lCadena := Trim(pCadena);
+  for lI := 1 to Length(lCadena) do
+  Begin
+    lPos := Pos(lCadena[lI], Const_Semillas);
+    Result := Result + Const_Letrados[lPos];
+  End;
+  Result := Trim(Result);
+End;
+
+Function SiNo(pCadena : String) : Boolean;
+Begin
+  Result := Dialogs.MessageDlg(pCadena, mtConfirmation, [mbYes, mbNo], 0, mbYes) = mrYes;
+End;
+
+Procedure Mensajes(pCadena : String);
+Begin
+  Dialogs.MessageDlg(pCadena, mtInformation,  [mbOk], 0, mbOk);
+End;
+
+Function SetToFloat(Const pValue : String) : Double;
+Var
+  lE : Integer;
+Begin
+  Val(pValue, Result, lE);
+End;
+
 
 end.

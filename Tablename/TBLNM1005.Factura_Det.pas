@@ -25,7 +25,6 @@ Begin
       pSQl.SQL.Add('   (  '                                                                  );
       pSQl.SQL.Add('      NUMERO_DOCUMENTO ' + FnReturn_Type(TYPE_VARCHAR) + ' (020) ' + ', ');
       pSQl.SQL.Add('      CODIGO_PRODUCTO '  + FnReturn_Type(TYPE_VARCHAR) + ' (020) ' + ', ');
-      pSQl.SQL.Add('      FECHA_DOCUMENTO '  + FnReturn_Type(TYPE_VARCHAR) + ' (010) ' + ', ');
       pSQl.SQL.Add('      CANTIDAD '          + FnReturn_Type(TYPE_FLOAT ) + ' '       + ', ');
       pSQl.SQL.Add('      VALOR '            + FnReturn_Type(TYPE_FLOAT  ) + ' '       + ', ');
       pSQl.SQL.Add('      TAG_INFO '         + FnReturn_Type(TYPE_INT    ) + ' '       + ', ');

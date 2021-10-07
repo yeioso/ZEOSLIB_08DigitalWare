@@ -75,13 +75,17 @@ Type
       Function Is_Number(pDataType : TFieldType) : Boolean;
       Function Data_Exists(Const pTablename: String; Const pFields, pValues: TArray_String; Const pSource : String) : Boolean;
       Function Max_Value(Const pTablename: String; Const pFields, pValues: TArray_String; Const pResult, pSource: String) : String;
+      Function Next(Const pTablename : String; Const pPrefix : Char; Const pPK, pField, pValue : TArray_String; Const pMaxWidth : Integer) : String;
       Function Get_ValueString(Const pTablename: String; Const pFields, pValues, pResult : TArray_String; Const pSource: String) : String;
       Function Get_ValueDouble(Const pTablename: String; Const pFields, pValues, pResult : TArray_String; Const pSource: String) : Double;
+      Function No_Lock : String;
       Function Exec_SQL(Const pSQL, pSource: String) : Boolean;
       Procedure CreateLookUp(pQr, pLookup : TDATADB; Const pFieldName, pKeyField, pLookupKeyFields, pLookupResultField : String; Const pSize : Integer);
       Procedure CreateFieldFloat(pQr : TDATADB; Const pFieldName : String);
       Procedure CreateFieldString(pQr : TDATADB; Const pFieldName : String; Const pSize : Integer);
       Procedure CreateFieldInteger(pQr : TDATADB; Const pFieldName : String);
+      Procedure SetFields(pQr : TQuery; Const pTable : String);
+      Procedure SetCalculate(pQr : TQuery; Const pName : String; pSize : Integer; pDataType : TFieldType);
   End;
 
 Var
@@ -98,7 +102,10 @@ implementation
 
 Uses
   Utils.Log,
+  System.Math,
+  Utils.Functions,
   System.SysUtils,
+  System.StrUtils,
   Utils.Homologacion;
 
 { TQUERY }
@@ -330,6 +337,113 @@ Begin
   End;
 End;
 
+Procedure TConexion.SetFields(pQr : TQuery; Const pTable : String);
+Var
+  lI : Integer;
+  lSQL : TQUERY;
+  lFieldStr : TStringField;
+  lFieldInt : TIntegerField;
+  lFieldDbl : TFloatField;
+  lFieldMem : TMemoField;
+Begin
+  Try
+    lSQL := TQUERY.Create(Nil);
+    lSQL.SQL.Add(' SELECT * FROM ' + pTable + ' ');
+    lSQL.Active := True;
+    If lSQL.Active Then
+    Begin
+      For lI := 0 To lSQL.Fields.Count-1 Do
+      Begin
+        Case lSQL.Fields[lI].DataType Of
+          ftString     ,
+          ftWideString : Begin
+                           lFieldStr := TStringField.Create(pQr);
+                           lFieldStr.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldStr.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldStr.Size      := lSQL.Fields[lI].Size     ;
+                           lFieldStr.DataSet   := pQr;
+                         End;
+          ftInteger     ,
+          ftSmallint   : Begin
+                           lFieldInt := TIntegerField.Create(pQr);
+                           lFieldInt.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldInt.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldInt.DataSet   := pQr;
+                         End;
+          ftFloat      : Begin
+                           lFieldDbl := TFloatField.Create(pQr);
+                           lFieldDbl.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldDbl.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldDbl.DataSet   := pQr;
+                         End;
+          ftMemo       : Begin
+                           lFieldMem := TMemoField.Create(pQr);
+                           lFieldMem.FieldName := lSQL.Fields[lI].FullName;
+                           lFieldMem.FieldKind := lSQL.Fields[lI].FieldKind;
+                           lFieldMem.DataSet   := pQr;
+                         End;
+        End;
+      End;
+    End;
+    lSQL.Active := False;
+    FreeAndNil(lSQL);
+  Except
+    On E: Exception Do
+    Begin
+      UtLog_Execute('TObjForm.SetFields, ' + E.Message);
+    End;
+  End;
+End;
+
+Procedure TConexion.SetCalculate(pQr : TQuery; Const pName : String; pSize : Integer; pDataType : TFieldType);
+Var
+  lFieldStr : TStringField;
+  lFieldInt : TIntegerField;
+  lFieldDbl : TFloatField;
+  lFieldMem : TMemoField;
+Begin
+  Try
+        Case pDataType Of
+          ftString     ,
+          ftWideString : Begin
+                           lFieldStr := TStringField.Create(pQr);
+                           lFieldStr.FieldName  := pName;
+                           lFieldStr.FieldKind  := TFieldKind.fkCalculated;
+                           lFieldStr.Size       := pSize;
+                           lFieldStr.Calculated := True;
+                           lFieldStr.DataSet    := pQr;
+                         End;
+          ftInteger     ,
+          ftSmallint   : Begin
+                           lFieldInt := TIntegerField.Create(pQr);
+                           lFieldInt.FieldName  := pName;
+                           lFieldInt.FieldKind  := TFieldKind.fkCalculated;
+                           lFieldInt.Calculated := True;
+                           lFieldInt.DataSet    := pQr;
+                         End;
+          ftFloat      : Begin
+                           lFieldDbl := TFloatField.Create(pQr);
+                           lFieldDbl.FieldName  := pName;
+                           lFieldDbl.FieldKind  := TFieldKind.fkCalculated;
+                           lFieldDbl.Calculated := True;
+                           lFieldDbl.DataSet    := pQr;
+                         End;
+          ftMemo       : Begin
+                           lFieldMem := TMemoField.Create(pQr);
+                           lFieldMem.FieldName  := pName;
+                           lFieldMem.FieldKind  := TFieldKind.fkCalculated;
+                           lFieldMem.Calculated := True;
+                           lFieldMem.DataSet    := pQr;
+                         End;
+        End;
+  Except
+    On E: Exception Do
+    Begin
+      UtLog_Execute('TObjForm.SetCalculate, ' + E.Message);
+    End;
+  End;
+End;
+
 procedure TConexion.SetConnection(pValue: TTIPO_CONEXION);
 begin
   FTYPE_CNX := pValue;
@@ -489,6 +603,35 @@ Begin
   End;
 End;
 
+Function TConexion.Next(Const pTablename : String; Const pPrefix : Char; Const pPK, pField, pValue : TArray_String; Const pMaxWidth : Integer) : String;
+Var
+  lI : Integer;
+Begin
+  Result := Justificar('', pPrefix, pMaxWidth);
+  Try
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+    FSQL.SQL.Add(' SELECT ');
+    For lI := Low(pPK) To High(pPK) Do
+      FSQL.SQL.Add(' MAX( ' + pPK[lI] + ' ) AS RESULTADO ');
+    FSQL.SQL.Add(' FROM ' + pTablename + ' ' + No_Lock + ' ');
+    If High(pField) > -1 Then
+    Begin
+      For lI := Low(pField) To High(pField) Do
+        FSQL.SQL.Add(IfThen(lI = Low(pField), ' WHERE ', ' AND ') + Trim_Sentence(pField[lI]) + ' = ' + QuotedStr(Trim(pValue[lI])));
+    End;
+    FSQL.Active := True;
+    If FSQL.Active And (FSQL.RecordCount > 0) And (Not Vacio(FSQL.FieldByName('RESULTADO').AsString)) Then
+      Result := FSQL.FieldByName('RESULTADO').AsString;
+    FSQL.Active := False;
+    FSQL.SQL.Clear;
+  Except
+    On E: Exception Do
+      UtLog_Execute('TConexion.Next, ' + E.Message);
+  End;
+  Next_Value(Result);
+End;
+
 Function TConexion.Get_ValueString(Const pTablename: String; Const pFields, pValues, pResult : TArray_String; Const pSource: String) : String;
 Var
   lI : Integer;
@@ -620,6 +763,13 @@ Begin
     On E : Exception Do
       UtLog_Execute('TConexion.Data_Exists, ' + pSource + ', ' + E.Message);
   End;
+End;
+
+Function TConexion.No_Lock : String;
+Begin
+  Result := ' ';
+  If FTYPE_CNX = Conn_SQLSERVER Then
+    Result := ' (NOLOCK) ';
 End;
 
 destructor TConexion.Destroy;
